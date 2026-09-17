@@ -1,0 +1,6 @@
+# This tree is exported on its own: never commit secrets or build output.
+.env
+.env.*
+broadcast/
+out/
+cache/

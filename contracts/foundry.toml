@@ -1,0 +1,31 @@
+# RWA Guard — 刻意零外部依赖。
+#
+# 🔴 别跑 `forge init` / `forge install`:它们会把依赖装成 git submodule(实测 2026-09-08,
+#    .gitmodules + mode 160000 gitlink)。
+#    ⚠ 理由不是「git 看不见它」:嵌套 .git【目录】与 gitlink【文件】两种落盘形态,
+#    提交前的检查都会判成「没检查过的区域」并拒绝放行。所以这不是「以后可能有问题」,
+#    是现在就挡。
+#    需要 forge-std 那类基座时,自带最小版本(test/Base.sol),不 vendor 第三方源码树 ——
+#    vendor 一棵第三方源码树会凭空多出上千个待审文件,得不偿失。
+#
+# 🔴 构建产物必须落在仓外:提交前的检查扫的是整棵工作树、不读 .gitignore,
+#    而 forge 的 out/ 里内嵌机器绝对路径。本地跑法:
+#      FOUNDRY_OUT=<仓外目录> FOUNDRY_CACHE_PATH=<仓外目录> forge test
+#    这里的 out/cache 只是给评委 clone 后直接 `forge test` 用的默认值。
+
+[profile.default]
+src = "src"
+test = "test"
+out = "out"
+cache_path = "cache"
+libs = []
+solc = "0.8.24"
+# 🔴 显式钉住,不靠 foundry 默认值。测量条件:system_surface.md §J(2026-09-08,只读测量)—— 方法同 §I:eth_call + state override,无交易、无密钥;测了 PUSH0(0x5f,Shanghai)· MCOPY(0x5e,Cancun)· TLOAD/TSTORE(0x5c/0x5d,EIP-1153 —— §J 逐字记的是「✅ round-trips」,即【值真的回来了】,不只是没 revert;判别力在 store-then-load 回 0x2a 与 load-without-store 回 0x0 的差上),两条链(Robinhood 46630 / Arbitrum Sepolia)全部如此 ⇒ 两条链都是 Cancun 级。
+#    每一轮都带两条控制臂:① eth_chainId 回显(0xb626 / 0x66eee);② 一个不含任何新 opcode、返回 0x2a 的程序,用来证明 state override 本身在工作。
+# ⚠ 边界:这让 evm_version = "cancun" 在两条链上都安全,但它【不等于】solc 0.8.24 被选定 —— 编译器由上面 solc = "0.8.24" 那行钉住。源码 pragma 同样写精确的 0.8.24、不用 caret(2026-09-15 定):测试只在 0.8.24 上跑过,而 RWAGuard 是 internal library,集成方会用自己的工具链把它编进自己的合约,只有精确 pragma 拦得住一个没跑过这套测试的编译器;代价是集成方也得用 0.8.24,要换版本就自己改 pragma 并重跑全套测试。 钉住它的理由没变:V1–V5 的 opcode 断言全部以 cancun 为前提,一次 foundry 升级换掉隐式默认值,断言就会在无人改动源码的情况下改变含义。
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+# 守护合约只读外部合约,失败必须可捕获而不是整笔回滚
+via_ir = false
+fs_permissions = [{ access = "read", path = "./test/fixtures" }]

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RWA Guard — is this token safe to act on, right now?</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>RWA Guard</h1>
+  <p class="tagline">Today there is no on-chain primitive that answers the question
+     <em>&ldquo;is this token safe to act on, right now?&rdquo;</em>
+     <strong>RWA Guard</strong> makes that question a single call.</p>
+  <p class="scope">The guard reports the absence of eight named conditions, plus an unreadable bit when it could not check one. It does not check the integrator's own accounting.</p>
+</header>
+
+<main>
+
+<section class="panel">
+  <h2>1 &middot; Ask the chain</h2>
+
+  <div class="grid">
+    <label>Chain
+      <select id="chain">
+        <option value="arbitrum-sepolia">Arbitrum Sepolia</option>
+        <option value="robinhood-testnet">Robinhood Chain testnet</option>
+      </select>
+    </label>
+
+    <label>RPC endpoint
+      <input id="rpc" type="text" spellcheck="false">
+    </label>
+
+    <label>Guard view contract
+      <input id="guard" type="text" spellcheck="false" placeholder="0x… (not deployed yet)">
+    </label>
+
+    <label>Token to judge
+      <input id="token" type="text" spellcheck="false" placeholder="0x…">
+    </label>
+  </div>
+
+  <h3>Ctx &mdash; the caller pins every one of these. None is inferred.</h3>
+  <div class="grid">
+    <label>priceFeed <span class="hint">G6 / G8</span>
+      <input id="priceFeed" type="text" spellcheck="false" placeholder="0x…">
+    </label>
+    <label>actor <span class="hint">G3 &middot; never taken from msg.sender</span>
+      <input id="actor" type="text" spellcheck="false" placeholder="0x…">
+    </label>
+    <label>counterparty <span class="hint">G3 &middot; same as actor for an explicit action</span>
+      <input id="counterparty" type="text" spellcheck="false" placeholder="0x…">
+    </label>
+    <label>expectedImpl <span class="hint">G4 &middot; the implementation you audited</span>
+      <input id="expectedImpl" type="text" spellcheck="false" placeholder="0x…">
+    </label>
+    <label>maxFeedAge <span class="hint">G6 &middot; seconds. 0 is the strictest value, not &ldquo;unset&rdquo;</span>
+      <input id="maxFeedAge" type="text" inputmode="numeric" value="3600">
+    </label>
+  </div>
+
+  <button id="run" type="button">Check</button>
+  <p id="calldata" class="mono muted"></p>
+</section>
+
+<section class="panel" id="results" hidden>
+  <h2>2 &middot; What came back</h2>
+
+  <div id="control" class="arm"></div>
+  <div id="verdict" class="verdict"></div>
+  <div id="notes"></div>
+  <table id="bits"><thead><tr>
+    <th>Gate</th><th>Condition</th><th>Violated</th><th>Unreadable</th>
+  </tr></thead><tbody></tbody></table>
+  <p class="mono muted" id="raw"></p>
+</section>
+
+<section class="panel">
+  <h2>3 &middot; Decode a reasonBits value by hand</h2>
+  <p class="muted">The same decoder, with no network in the way. Paste any value the guard
+     produced &mdash; from a reverted transaction, a log, or a test run.</p>
+  <div class="grid">
+    <label>reasonBits
+      <input id="manualBits" type="text" spellcheck="false" placeholder="0x0 or a decimal value">
+    </label>
+  </div>
+  <button id="runManual" type="button">Decode</button>
+  <div id="manualOut"></div>
+</section>
+
+<section class="panel prose">
+  <h2>How this page decides</h2>
+
+  <p>Deny-by-default. Each row above is a reason bit.
+     <strong>A signal the guard cannot read is a <code>BLOCK</code>, not a pass</strong> &mdash;
+     an unreadable condition is not a satisfied condition. The decoder on this page implements
+     the decoding contract from <code>GuardBits.sol</code> in full, because a decoder that gets
+     it wrong recreates the exact &ldquo;could not determine, therefore allow&rdquo; path the
+     contract exists to close:</p>
+
+  <ol class="contract">
+    <li><code>ok == (reasonBits == 0)</code>. The verdict is never re-derived from a subset
+        of the bits.</li>
+    <li>Any bit set outside <code>KNOWN_MASK</code> means the payload came from a newer
+        version than this decoder. An old decoder must <strong>block</strong>, never silently
+        ignore it.</li>
+    <li><code>reasonBits &amp; RESERVED_MASK</code> must be zero. Bits 7 and 23 are permanently
+        reserved; non-zero means this payload was not produced by this version.</li>
+    <li>Bit 255 is an aggregate, not a ninth gate: it is set if and only if at least one bit on
+        the unreadable plane is set. The check uses <code>UNREADABLE_MASK</code>, never a
+        bit range.</li>
+    <li>Per gate, the violated bit and that gate's own unreadable bit are mutually
+        exclusive. Two different gates may each contribute one.</li>
+    <li>When bit 0 (G0) is set, bits 1, 3 and 4 are true statements about that canonical control
+        plane &mdash; not necessarily statements about this token's actual controller.</li>
+    <li>A failed call is a failed judgement, never <code>reasonBits == 0</code>. An empty return,
+        a revert this page cannot decode, or a transport error is reported as
+        <strong>undetermined</strong>, and undetermined is treated as a block.</li>
+  </ol>
+
+  <h3>The control arm, and why it is here</h3>
+  <p>Every run first asks the endpoint for <code>eth_chainId</code>. A rejected or unreachable
+     RPC makes <em>every</em> call fail, which reads exactly like &ldquo;the contract has none of
+     these functions&rdquo; or &ldquo;every gate is blocking&rdquo;. The tell is that the failures
+     are uniform. Keeping a call that is known to succeed in the same run is what separates a
+     transport symptom from a contract fact.</p>
+
+  <h3>On a chain where the token and control plane do not exist</h3>
+  <p>Both chains receive the same build artifact, deployed with a plain <code>CREATE</code>,
+     never <code>CREATE2</code> &mdash; different addresses on each chain are expected, not a
+     defect. On a chain where the token and the control plane do not exist, every call returns
+     <code>ok == false</code> with at least the unreadable bits of G0 through G5 and the
+     aggregate bit set. <strong>That is the designed consequence, not a bug.</strong> On Arbitrum
+     Sepolia only G0, G6 and G8 have anything to read.</p>
+
+  <h3>Time of check, time of use</h3>
+  <p>An off-chain answer from this page is <strong>advisory</strong> and carries a
+     time-of-check to time-of-use window; it can be stale as soon as the next block. Only
+     in-transaction evaluation through the integration library, reverting on failure, is atomic.
+     This page is a window onto the guard, not a substitute for calling it.</p>
+
+  <h3>Known limitations</h3>
+  <p>The guard reports the absence of eight named conditions, plus an unreadable bit when it could not check one. It does not check the integrator's own accounting.</p>
+  <p>Once a ratio transition has completed, the ratio condition reads clean; with every other condition clear, reasonBits is exactly 0 and the guard lets a redeem through. Both demo vaults pay one token per share and never use the multiplier in that payout, so after the transition both pay the wrong amount. In the tested case the ratio halves: each vault pays twice the fair amount, and the first redeem empties the guarded vault, so the next holder's redeem reverts. This exposure is declared, not fixed: test/Integration.t.sol measures it (AS-29d).</p>
+
+  <p class="muted">G7 was withdrawn on 2026-09-04; its bit stays permanently reserved.
+     This page is not an audit and carries no warranty.</p>
+</section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

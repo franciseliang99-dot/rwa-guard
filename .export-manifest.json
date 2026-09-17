@@ -1,0 +1,321 @@
+{
+  "schema": 2,
+  "entry_id": "entries/arbitrum-openhouse",
+  "signature_digest": "f7b39c2cf7da0ffd55d9211e547c5963fd16e157610616de11a18215f9d2e0d4",
+  "file_count": 35,
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "d7f53fdb2f838873f17e589d3e28f760d26d21cbb9bbeec2afbea5f8731058c3",
+      "rule": "exact-file",
+      "keys": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "contracts/.gitignore",
+      "sha256": "94133d05100f116020ff9a115a745eaa8cb6cffde7bf9e77989ed57ce305a1fd",
+      "rule": "dir-dotfile",
+      "keys": [
+        "contracts/",
+        ".gitignore"
+      ]
+    },
+    {
+      "path": "contracts/build_parity.sh",
+      "sha256": "150d743603dcbf4f739e11d3e1de6b846fc54d329604cd4d163d8dd6f48f0f66",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sh"
+      ]
+    },
+    {
+      "path": "contracts/forge.sh",
+      "sha256": "e91223f6a9d4aadc3966509437b444757a5855fbd7a55100010c02d1a208e34b",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sh"
+      ]
+    },
+    {
+      "path": "contracts/foundry.toml",
+      "sha256": "3343c42bdb786b7468ebedea7353456156170a6c7ed428e5bc35c10d929cc27d",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".toml"
+      ]
+    },
+    {
+      "path": "contracts/mutation_battery.sh",
+      "sha256": "f75a3096fa62e3dfa14b09e19786ad6aaa18d3cafb2c3acdff3a9b5ff416634c",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sh"
+      ]
+    },
+    {
+      "path": "contracts/script/Deploy.s.sol",
+      "sha256": "298b6f699105a667e49594844d7ccc8802ad3848c1d250a2ba50b9cdac8be317",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/src/GuardBits.sol",
+      "sha256": "bb9356df4e8fd46cbf8ab6aa2e1df9a191f7cef4459f4d2f78903d93a2159cf7",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/src/GuardCore.sol",
+      "sha256": "b40fa6d1efab05da1aa58f1ab6852e7d8d57e1beed12e248cc53463c8656336f",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/src/RWAGuard.sol",
+      "sha256": "52307c47bb3f096f59ce7b2719c0b9458bc42a45b9862cf9c19126cfb143ec0d",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/src/RWAGuardView.sol",
+      "sha256": "c2acecf2b8a4cfb00f8c65e4738cd219d9a7053bc169b7e89d0f43d2ae17da2f",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/src/demo/GuardedVault.sol",
+      "sha256": "7f275704d0d2e0f0c5f02fd5bc8bb24bffde962a0da9e541ef2e7f6eeee7681c",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/src/demo/NaiveVault.sol",
+      "sha256": "2e8094881bf2a6592a36cbc5de26a0217012b5461add5adaf327a187ce224443",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/src/demo/VaultBase.sol",
+      "sha256": "ffec144703e8a41662fb6e7ecdeeb8d8d54b1120b9da4fb288bfa2ecc1c23c90",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/Attacks.t.sol",
+      "sha256": "8a5afe2a09581d57b747a8a133a0bc2079af8c9f5071c296ed4fd9c10caab9c8",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/Base.sol",
+      "sha256": "8490c93fea014fe444f7a4281ad79c03a9bf23be468b4b2215fb27fd463099ba",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/DemoVaultEdges.t.sol",
+      "sha256": "333e5f0bdaf503458dbfcc2b94c1c6228daa096d38a9a93ab05981609cb3d175",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/DemoVaults.t.sol",
+      "sha256": "1986b94e41f914f489b7c0b5019f772dd28780c1e8cfdc75edfe0fff97312e19",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/DualForm.t.sol",
+      "sha256": "f24247a125c65cae770f0bc95da4ca2ce053449d08cd00a7b61af25878c3c85d",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/Fixtures.t.sol",
+      "sha256": "708235ffd0e5c5c179483ace7eb41b9eb61dcb17c13e7f5ab25eee8d5cf28a41",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/Gates.t.sol",
+      "sha256": "6477b9bb2a5177c04cd0eb5365f27a2d6974ff7fb8f20147360e538d60f09142",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/GuardBits.t.sol",
+      "sha256": "cd4323f80c406133fc4ef55ae4b2fa114cf477b505236a322b42edb39abbf4a3",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/Integration.t.sol",
+      "sha256": "c990bd8a020ecabfc890012e7a05dc38b7e146d64cfc39c5324eb002c53b4f09",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/Opcodes.t.sol",
+      "sha256": "7c77349cdbbbcd54168a070996008c2d5c613f9fd480c179c926a0a57b5d3b89",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/RWAGuard.t.sol",
+      "sha256": "2826312840e58c6b9c8e52f4f3991e94cd428ed1d1cf90a243e7df4bdcea2343",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/RWAGuardView.t.sol",
+      "sha256": "95bcd7570397b3e7b870065c7985d0e66ba969c7eafd522c5442f404bd56d51c",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/fixtures/README.md",
+      "sha256": "d7b0598a469f6204432f069c3d98f48113a32321419ec7a652726bf5b4900793",
+      "rule": "exact-file",
+      "keys": [
+        "contracts/test/fixtures/README.md"
+      ]
+    },
+    {
+      "path": "contracts/test/fixtures/equity-token-proxy.runtime.hex",
+      "sha256": "5631e0a64adf6344450cea790c562da88760785ac90359099358dfc7a053007a",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".hex"
+      ]
+    },
+    {
+      "path": "contracts/test/mocks/MockControlPlane.sol",
+      "sha256": "0ad713ed37cf7f81c7b0bfc6ec83b3fec242730dbdbed5026ce63a1193bdeffd",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/mocks/MockEquityToken.sol",
+      "sha256": "2b177fa1be57dd416f6a4b77449a63dccc49c00731f61dd77995030f18a10c61",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/test/mocks/MockPriceFeed.sol",
+      "sha256": "529c5edc3abbf0336ad6aa9b28a665ba9e0e463e64e0b99f7aba399f6dd8e8d0",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".sol"
+      ]
+    },
+    {
+      "path": "contracts/tools/fetch_equity_proxy_runtime.py",
+      "sha256": "3c34714ff0ae15b7255d48359c9e74be53b6492134261f5cc5f7ab9db3c342ec",
+      "rule": "dir-code-ext",
+      "keys": [
+        "contracts/",
+        ".py"
+      ]
+    },
+    {
+      "path": "web/app.js",
+      "sha256": "fe1a780755eafeb55d612849b2ef3e541e84b6f9a74b7a35a22daab40adbb1f0",
+      "rule": "dir-code-ext",
+      "keys": [
+        "web/",
+        ".js"
+      ]
+    },
+    {
+      "path": "web/index.html",
+      "sha256": "474c9b0487bbe40a3852982c860f5e6c211f5879ad5bc7a3643a5d5a20872d6b",
+      "rule": "dir-code-ext",
+      "keys": [
+        "web/",
+        ".html"
+      ]
+    },
+    {
+      "path": "web/style.css",
+      "sha256": "6547745b00d42a7922e999b48467ec9c83741bd43c67a0e0e9a4cb66d5f7df55",
+      "rule": "dir-code-ext",
+      "keys": [
+        "web/",
+        ".css"
+      ]
+    }
+  ]
+}
