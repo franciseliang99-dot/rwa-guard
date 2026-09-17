@@ -38,17 +38,17 @@ import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 //   bit 16 (G0) -> GuardCore.sol:177-180
 //   bit 17 (G1) -> GuardCore.sol:199-200
 //   bit 18 (G2) -> GuardCore.sol:213-214
-//   bit 19 (G3) -> GuardCore.sol:277-278
-//   bit 20 (G4) -> GuardCore.sol:302-307
-//   bit 21 (G5) -> GuardCore.sol:337-338
-//   bit 22 (G6) -> GuardCore.sol:378-384
-//   bit 24 (G8) -> GuardCore.sol:412-413
+//   bit 19 (G3) -> GuardCore.sol:288-289
+//   bit 20 (G4) -> GuardCore.sol:313-318
+//   bit 21 (G5) -> GuardCore.sol:348-349
+//   bit 22 (G6) -> GuardCore.sol:389-395
+//   bit 24 (G8) -> GuardCore.sol:423-424
 //
 // Reached in this file (the unreadable bit is asserted inside a full-value equality):
 //   G0 (16): AS4a (codehash 0), AS4b (empty-code hash), AS4c
 //   G1 (17): AS5_3, AS18 unreadable
 //   G2 (18): AS4a/b/c, AS5_3, AS6_2, AS6_3, AS18 unreadable
-//   G3 (19): AS8 zero-party arms (zero-argument cause); AS4a/b/c, AS5_3, AS18 unreadable (read failure)
+//   G3 (19): AS8 zero-party arms (zero-argument cause); AS5_3, AS18 unreadable (read failure)
 //   G4 (20): AS5_3, AS18 unreadable -- read-failure cause ONLY. The dirty-word cause and the
 //            zero-expectedImpl cause are NOT reached here: deleting either disjunct stays
 //            green in this file (KG-U7G-5).
@@ -253,6 +253,22 @@ abstract contract GatesBaseline is TestBase {
             }
         }
     }
+
+    function _countStaticCalldataAt(Vm.AccountAccess[] memory diff, address account, bytes memory callData)
+        internal
+        pure
+        returns (uint256 count)
+    {
+        bytes32 target = keccak256(callData);
+        for (uint256 i = 0; i < diff.length; i++) {
+            if (
+                diff[i].kind == Vm.AccountAccessKind.StaticCall && diff[i].account == account
+                    && keccak256(diff[i].data) == target
+            ) {
+                count++;
+            }
+        }
+    }
 }
 
 contract GatesTest is GatesBaseline {
@@ -364,8 +380,8 @@ contract GatesTest is GatesBaseline {
         uint256 bits = _eval(NEVER_DEPLOYED, e.ctx);
         assertEq(
             bits,
-            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 19) | (uint256(1) << 21) | (uint256(1) << 255),
-            "AS-4: a never-deployed token yields G0/G2/G3/G5 unreadable"
+            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 21) | (uint256(1) << 255),
+            "AS-4: a never-deployed token yields G0/G2/G5 unreadable"
         );
         _assertEvalCount(1);
     }
@@ -377,8 +393,8 @@ contract GatesTest is GatesBaseline {
         uint256 bits = _eval(EOA, e.ctx);
         assertEq(
             bits,
-            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 19) | (uint256(1) << 21) | (uint256(1) << 255),
-            "AS-4: an EOA token yields G0/G2/G3/G5 unreadable"
+            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 21) | (uint256(1) << 255),
+            "AS-4: an EOA token yields G0/G2/G5 unreadable"
         );
         _assertEvalCount(1);
     }
@@ -388,8 +404,8 @@ contract GatesTest is GatesBaseline {
         uint256 bits = _eval(address(0), e.ctx);
         assertEq(
             bits,
-            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 19) | (uint256(1) << 21) | (uint256(1) << 255),
-            "AS-4: the zero-address token yields G0/G2/G3/G5 unreadable"
+            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 21) | (uint256(1) << 255),
+            "AS-4: the zero-address token yields G0/G2/G5 unreadable"
         );
         _assertEvalCount(1);
     }
@@ -469,19 +485,92 @@ contract GatesTest is GatesBaseline {
         _assertEvalCount(1);
     }
 
-    function test_AS7_1_tokenBlocksActor() public {
+    function test_AS7_1_tokenWithoutIsBlockedIsReadableClean() public {
         Env memory e = _baseline();
-        MockEquityToken(e.token).setBlocked(ACTOR, true);
-        uint256 bits = _eval(e.token, e.ctx);
-        assertEq(bits, (uint256(1) << 3), "AS-7: a token-side block on the actor yields exactly bit 3");
+        (bool ok, bytes memory ret) =
+            e.token.staticcall(abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR));
+        assertFalse(ok, "AS-7: the token must not answer isBlocked");
+        assertEq(ret.length, 0, "AS-7: the token answers isBlocked with an empty revert, like the real token");
+        (uint256 bits, Vm.AccountAccess[] memory diff) = _evalRecorded(e.token, e.ctx);
+        assertEq(bits, 0, "AS-7: a token with no isBlocked stays clean under G3, which reads only the plane");
+        assertEq(
+            _countStaticCalldataAt(diff, e.token, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)),
+            0,
+            "AS-7: isBlocked(actor) is never sent to the token"
+        );
+        assertEq(
+            _countStaticCalldataAt(
+                diff, e.token, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, COUNTERPARTY)
+            ),
+            0,
+            "AS-7: isBlocked(counterparty) is never sent to the token"
+        );
+        assertEq(
+            _countStaticCalldataAt(
+                diff, GuardCore.CONTROL_PLANE, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)
+            ),
+            1,
+            "AS-7: isBlocked(actor) is sent exactly once, to the control plane"
+        );
+        assertEq(
+            _countStaticCalldataAt(
+                diff,
+                GuardCore.CONTROL_PLANE,
+                abi.encodeWithSelector(MockControlPlane.isBlocked.selector, COUNTERPARTY)
+            ),
+            1,
+            "AS-7: isBlocked(counterparty) is sent exactly once, to the control plane"
+        );
         _assertEvalCount(1);
     }
 
-    function test_AS7_2_tokenBlocksCounterparty() public {
+    function test_AS7_2_tokenAnsweringIsBlockedIsNotRead() public {
         Env memory e = _baseline();
-        MockEquityToken(e.token).setBlocked(COUNTERPARTY, true);
-        uint256 bits = _eval(e.token, e.ctx);
-        assertEq(bits, (uint256(1) << 3), "AS-7: a token-side block on the counterparty yields exactly bit 3");
+        MockControlPlane fx = new MockControlPlane();
+        fx.setBlocked(ACTOR, true);
+        fx.setBlocked(COUNTERPARTY, true);
+        (bool ok, bytes memory ret) =
+            address(fx).staticcall(abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR));
+        assertTrue(ok, "AS-7: the fixture standing in as token must answer isBlocked");
+        assertEq(ret.length, 32, "AS-7: the fixture's isBlocked reply is exactly one word");
+        assertTrue(abi.decode(ret, (uint256)) != 0, "AS-7: the fixture's isBlocked reply is a nonzero word");
+        (uint256 bits, Vm.AccountAccess[] memory diff) = _evalRecorded(address(fx), e.ctx);
+        // Full value is derived as (1<<0) | (1<<21) | (1<<255): G0 (fx is not the known proxy
+        // codehash) and G5 unreadable (fx implements none of uiMultiplier/newUIMultiplier/
+        // effectiveAt), plus the aggregate bit. Only the mask below is asserted (Test Spec 2).
+        assertEq(
+            bits & ((uint256(1) << 3) | (uint256(1) << 19)),
+            0,
+            "AS-7: G3 never reads the token parameter, so a token-shaped isBlocked(true) leaves bits 3 and 19 clear"
+        );
+        assertEq(
+            _countStaticCalldataAt(diff, address(fx), abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)),
+            0,
+            "AS-7: isBlocked(actor) is never sent to the token-parameter fixture"
+        );
+        assertEq(
+            _countStaticCalldataAt(
+                diff, address(fx), abi.encodeWithSelector(MockControlPlane.isBlocked.selector, COUNTERPARTY)
+            ),
+            0,
+            "AS-7: isBlocked(counterparty) is never sent to the token-parameter fixture"
+        );
+        assertEq(
+            _countStaticCalldataAt(
+                diff, GuardCore.CONTROL_PLANE, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)
+            ),
+            1,
+            "AS-7: isBlocked(actor) is sent exactly once, to the control plane"
+        );
+        assertEq(
+            _countStaticCalldataAt(
+                diff,
+                GuardCore.CONTROL_PLANE,
+                abi.encodeWithSelector(MockControlPlane.isBlocked.selector, COUNTERPARTY)
+            ),
+            1,
+            "AS-7: isBlocked(counterparty) is sent exactly once, to the control plane"
+        );
         _assertEvalCount(1);
     }
 
@@ -501,21 +590,62 @@ contract GatesTest is GatesBaseline {
         _assertEvalCount(1);
     }
 
+    function test_AS7_5_g3FanOutIsTwoPlaneReads() public {
+        Env memory e = _baseline();
+        (, Vm.AccountAccess[] memory diff1) = _evalRecorded(e.token, e.ctx);
+        assertEq(
+            _countStaticCalldataAt(
+                diff1, GuardCore.CONTROL_PLANE, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)
+            ),
+            1,
+            "AS-7: arm 1 sends isBlocked(actor) to the plane exactly once"
+        );
+        assertEq(
+            _countStaticCalldataAt(
+                diff1,
+                GuardCore.CONTROL_PLANE,
+                abi.encodeWithSelector(MockControlPlane.isBlocked.selector, COUNTERPARTY)
+            ),
+            1,
+            "AS-7: arm 1 sends isBlocked(counterparty) to the plane exactly once"
+        );
+        assertEq(
+            _countStaticCalldataAt(diff1, e.token, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)),
+            0,
+            "AS-7: arm 1 never sends isBlocked(actor) to the token address"
+        );
+        assertEq(
+            _countStaticCalldata(diff1, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)),
+            1,
+            "AS-7: arm 1's total isBlocked(actor) count across all accounts is exactly 1"
+        );
+
+        Env memory e2 = _baseline();
+        e2.ctx.counterparty = ACTOR;
+        (, Vm.AccountAccess[] memory diff2) = _evalRecorded(e2.token, e2.ctx);
+        assertEq(
+            _countStaticCalldataAt(
+                diff2, GuardCore.CONTROL_PLANE, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)
+            ),
+            2,
+            "AS-7: arm 2 (actor == counterparty) sends isBlocked(actor) to the plane twice, no dedup"
+        );
+    }
+
     // AS-8 (covers test_AS8_zeroActor, test_AS8_zeroCounterparty, test_AS8_positiveControl).
     // Not a forbidden short-circuit: G3 still sets its bit (bit 19). A zero party field marks G3
-    // unreadable before any read is sent, and the two isBlocked reads keyed on that field are
-    // never sent; the other field's two reads are still sent. The reason is not "there is nothing
+    // unreadable before any read is sent, and the one isBlocked read keyed on that field is
+    // never sent; the other field's one read is still sent. The reason is not "there is nothing
     // to read": isBlocked(address(0)) would return a real answer, but about the wrong subject, so
     // it does not answer the question this bit is about.
     // SD-3: the full-value check alone (bit 19 set, bit 3 clear) cannot show that those reads were
     // not sent. An unreadable G3 discards every word it read, so a mutant that sends isBlocked(0)
     // and gets true still produces the same value. The recorder counts are the real check:
-    // isBlocked(0) is sent 0 times, while the non-zero party's isBlocked is sent exactly 2 times
-    // (one token read, one plane read) in the same recording, which proves the full-calldata
-    // channel works and the zero count is not zero for an unrelated reason.
+    // isBlocked(0) is sent 0 times, while the non-zero party's isBlocked is sent exactly once
+    // (to the control plane; the token is never asked) in the same recording, which proves the
+    // full-calldata channel works and the zero count is not zero for an unrelated reason.
     function test_AS8_zeroActor() public {
         Env memory e = _baseline();
-        MockEquityToken(e.token).setBlocked(address(0), true);
         e.plane.setBlocked(address(0), true);
         e.ctx.actor = address(0);
         (uint256 bits, Vm.AccountAccess[] memory diff) = _evalRecorded(e.token, e.ctx);
@@ -531,15 +661,14 @@ contract GatesTest is GatesBaseline {
         );
         assertEq(
             _countStaticCalldata(diff, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, COUNTERPARTY)),
-            2,
-            "AS-8: isBlocked(counterparty) is sent exactly twice"
+            1,
+            "AS-8: isBlocked(counterparty) is sent exactly once"
         );
         _assertEvalCount(1);
     }
 
     function test_AS8_zeroCounterparty() public {
         Env memory e = _baseline();
-        MockEquityToken(e.token).setBlocked(address(0), true);
         e.plane.setBlocked(address(0), true);
         e.ctx.counterparty = address(0);
         (uint256 bits, Vm.AccountAccess[] memory diff) = _evalRecorded(e.token, e.ctx);
@@ -555,24 +684,23 @@ contract GatesTest is GatesBaseline {
         );
         assertEq(
             _countStaticCalldata(diff, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)),
-            2,
-            "AS-8: isBlocked(actor) is sent exactly twice"
+            1,
+            "AS-8: isBlocked(actor) is sent exactly once"
         );
         _assertEvalCount(1);
     }
 
     function test_AS8_positiveControl() public {
         Env memory e = _baseline();
-        MockEquityToken(e.token).setBlocked(address(0), true);
         e.plane.setBlocked(address(0), true);
-        MockEquityToken(e.token).setBlocked(BLOCKED_ACTOR, true);
+        e.plane.setBlocked(BLOCKED_ACTOR, true);
         e.ctx.actor = BLOCKED_ACTOR;
         (uint256 bits, Vm.AccountAccess[] memory diff) = _evalRecorded(e.token, e.ctx);
         assertEq(bits, (uint256(1) << 3), "AS-8: a real block on a non-zero actor yields exactly bit 3");
         assertEq(
             _countStaticCalldata(diff, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, BLOCKED_ACTOR)),
-            2,
-            "AS-8: isBlocked(blockedActor) is sent exactly twice"
+            1,
+            "AS-8: isBlocked(blockedActor) is sent exactly once"
         );
         assertEq(
             _countStaticCalldata(diff, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, address(0))),
@@ -863,8 +991,8 @@ contract GatesTest is GatesBaseline {
         MockEquityToken(e.token).setMutator(
             MockEquityToken.paused.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0)
         );
-        MockEquityToken(e.token).setMutator(
-            MockEquityToken.isBlocked.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0)
+        e.plane.setMutator(
+            MockControlPlane.isBlocked.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0)
         );
         MockEquityToken(e.token).setMutator(
             MockEquityToken.uiMultiplier.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0)
@@ -918,19 +1046,29 @@ contract GatesTest is GatesBaseline {
         _assertEvalCount(1);
     }
 
-    // AS-18: the control plane is paused (bit 1) while its blocked-party read separately reverts;
-    // the blocked-party gate absorbs that unreadable read rather than reporting a violation, so
-    // its violated bit never appears even though the token itself also has a real block set.
+    // AS-18: the control plane is paused (bit 1) while G3's blocked-party gate is unreadable
+    // because ctx.counterparty is zero; that missing counterparty already forces the unreadable
+    // branch, but the actor's own isBlocked(actor) read is still issued and comes back a nonzero
+    // word, which the readable branch never sees. This pins `if (unreadable) ... else if
+    // (words != bytes32(0))`: an `else if` -> `if` mutant would evaluate the nonzero-word check
+    // too, wrongly adding bit 3 alongside the unreadable bit.
     function test_AS18_combo6_g3AbsorbsBesideG1() public {
         Env memory e = _baseline();
         e.plane.setPaused(true);
-        e.plane.setMutator(MockControlPlane.isBlocked.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0));
-        MockEquityToken(e.token).setBlocked(ACTOR, true);
-        uint256 bits = _eval(e.token, e.ctx);
+        e.ctx.counterparty = address(0);
+        e.plane.setBlocked(ACTOR, true);
+        (uint256 bits, Vm.AccountAccess[] memory diff) = _evalRecorded(e.token, e.ctx);
         assertEq(
             bits,
             (uint256(1) << 1) | (uint256(1) << 19) | (uint256(1) << 255),
             "AS-18: plane paused beside an unreadable blocklist yields exactly bits 1, 19 and the aggregate bit"
+        );
+        assertEq(
+            _countStaticCalldataAt(
+                diff, GuardCore.CONTROL_PLANE, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)
+            ),
+            1,
+            "AS-18: isBlocked(actor) is read exactly once and its nonzero word is discarded, since counterparty is unset"
         );
         _assertEvalCount(1);
     }
@@ -963,8 +1101,8 @@ contract GatesTest is GatesBaseline {
         // structurally by that filter; nothing outside StaticCall is counted. AS-18b must not
         // assert reasonBits.
         (, Vm.AccountAccess[] memory diff) = _evalRecorded(e.token, e.ctx);
-        // U2 §6.3 G2 1 + §6.4 G3 2 + §6.6 G5 3
-        assertEq(_countStatic(diff, e.token), 6, "AS-18: token fan-out must stay exactly 6");
+        // U2 §6.3 G2 1 + §6.6 G5 3
+        assertEq(_countStatic(diff, e.token), 4, "AS-18: token fan-out must stay exactly 4");
         // U2 §6.2 G1 1 + §6.4 G3 2 + §6.5 G4 1
         assertEq(
             _countStatic(diff, GuardCore.CONTROL_PLANE),
@@ -973,7 +1111,7 @@ contract GatesTest is GatesBaseline {
         );
         // U2 §6.7 round 1 + §6.9 description 1
         assertEq(_countStatic(diff, address(e.feed)), 2, "AS-18: feed fan-out must stay exactly 2");
-        assertEq(_countStaticAll(diff), 12, "AS-18: total fan-out must stay exactly 12");
+        assertEq(_countStaticAll(diff), 10, "AS-18: total fan-out must stay exactly 10");
         _assertEvalCount(1);
     }
 
@@ -983,7 +1121,7 @@ contract GatesTest is GatesBaseline {
         _nonProxyToken(e);
         e.plane.setPaused(true);
         MockEquityToken(e.token).setPaused(true);
-        MockEquityToken(e.token).setBlocked(ACTOR, true);
+        e.plane.setBlocked(ACTOR, true);
         e.plane.setImplementation(address(new MockEquityToken()));
         MockEquityToken(e.token).setRatios(1e18, 2e18, 0);
         e.feed.setFollowNow(false);

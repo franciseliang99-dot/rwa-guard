@@ -355,7 +355,7 @@ contract AttacksExposureTest is AttacksBase {
         _assertEvalCount(2);
     }
 
-    // TS-6 (AS-21): this exercises the non-proxy token, whose six reads are answered by
+    // TS-6 (AS-21): this exercises the non-proxy token, whose four reads (G2 one, G5 three) are answered by
     // standalone code and never consult the plane. RAW_WORD on implementation() gives a full
     // 32-byte reply, so readable holds and only the dirty high bytes set bit 20.
     function test_AS21_implWordDirtyHighBytesUnreadable() public {
@@ -452,7 +452,7 @@ contract AttacksExposureTest is AttacksBase {
     // latestRoundData() and description() have no recorded hex literal anywhere in this file;
     // that gap is left open on purpose (KG-U7A-7). KG-U3-10: none of the eight collides with
     // balanceOf/totalSupply, which bounds the ERC-20 half together with AS-18b's fan-out of
-    // twelve (KG-U7A-6); no behavioural forced-value ERC-20 test is written here.
+    // ten (KG-U7A-6); no behavioural forced-value ERC-20 test is written here.
     function test_AS34_selectorsTwoMechanisms() public pure {
         bytes4[8] memory sels = _at34_selectors();
         _at34_checkAgreement(sels);

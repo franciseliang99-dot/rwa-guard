@@ -49,7 +49,7 @@ import {GuardBits, Ctx} from "./GuardBits.sol";
 /// @dev ════ D4 · 全部求值,无短路 —— 闸间与闸内都是 ════
 ///      八道闸全部求值,不因 G0 失败而跳过其余:短路会让后续各闸的位保持干净,而干净的位读作
 ///      「条件不成立」—— 那正是把「读不到」伪装成「通过」的形状。gas 更贵是知情接受的代价。
-///      🔴【闸内也不短路】:G3 的四次读、G5 的三次读必须先全部发出、结果落进局部变量,再组合
+///      🔴【闸内也不短路】:G3 的两次读、G5 的三次读必须先全部发出、结果落进局部变量,再组合
 ///      判据。写成 `r1 && r2 && r3` 会在第一次失败时跳过后面的读 = 静默削掉扇出;而在「全部读
 ///      都成功」那一臂上,短路与不短路的读取次数【完全相同】⇒ 那个写法在按次数计量的检查上
 ///      结构性隐形。本文件里 `||` / `|=` 对判据的组合一律发生在【该发出的读已经全部发出之后】,
@@ -127,8 +127,8 @@ library GuardCore {
     // 🔴 另一种导出机制(`interface` 类型的 `.selector`)刻意【住在测试文件里】,不在本文件:
     //    两种机制若都住在这里,「两种机制结果一致」的断言就是拿本文件和它自己比,承载 0 bit。
     //    这也是本文件零 `interface` 声明的第二个理由(第一个见 F1)。
-    // ⚠ 具名常量而不是把表达式内联到调用点:`isBlocked(address)` 被用 4 次、`paused()` 被用
-    //    2 次,内联就是同一个签名字符串的 4 份 / 2 份表示。具名让每个签名在本文件里恰好出现一次。
+    // ⚠ 具名常量而不是把表达式内联到调用点:`isBlocked(address)` 与 `paused()` 各被用 2 次,
+    //    内联就是同一个签名字符串的 2 份表示。具名让每个签名在本文件里恰好出现一次。
     // ═════════════════════════════════════════════════════════════════════════
     bytes4 internal constant SEL_PAUSED            = bytes4(keccak256(bytes("paused()")));
     bytes4 internal constant SEL_IS_BLOCKED        = bytes4(keccak256(bytes("isBlocked(address)")));
@@ -218,26 +218,49 @@ library GuardCore {
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // 4 · G3 封禁(bit 3 / bit 19)—— 四次查询,顺序固定:
-        //       token.isBlocked(actor) → token.isBlocked(counterparty)
-        //       → 控制面.isBlocked(actor) → 控制面.isBlocked(counterparty)
+        // 4 · G3 封禁(bit 3 / bit 19)—— 两次查询,都发给控制面,顺序固定:
+        //       控制面.isBlocked(actor) → 控制面.isBlocked(counterparty)
         //
-        // ⚠ 为什么是四次而不是两次:`isBlocked` 这个 selector 在代币和控制面【两处都存在】,
-        //    而代币的 `isBlocked` 是不是转发到控制面,本项目【没有测过】。别脑补它转发。
-        //    若它不转发而各有一份名单,只读控制面就会静默漏掉代币侧记录的封禁 —— 那是一条
-        //    从「真实存在一条封禁」到「位是干净的」的路径。未知之下 deny-by-default 的正确
-        //    形状是【都读】。
-        // ⚠ 行为方 / 对手方为零地址时,与【那个字段】相关的两次 `isBlocked` 不发出,位照样
+        // ⚠ 为什么【不】问代币(2026-09-16 实测,链 46630,全部 eth_call / 本地 fork):
+        //    ① 对真实股票代币 0xc9f9…bd4e 调 `isBlocked(address)` ⇒ revert,返回数据为空;
+        //       同一地址上的对照臂 `paused()` 返回 32 字节 0 ⇒ 不是「地址打不通」,是这个
+        //       函数不存在。控制面 0x1dF3…6Ca5 的 `isBlocked` 返回 32 字节 0。
+        //    ② 控制面 `implementation()` 指向的实现 0xbd14…57da,分发表里的 32 个 selector
+        //       中没有 `0xfbac3951`;它字节码里出现这四个字节,是它【发给控制面】的调用参数
+        //       (PUSH4),不是它自己的入口。
+        //    ③ 一笔零额转账(dEaD→bEEF)的 trace:代理先问控制面 `implementation()`,
+        //       delegatecall 进实现,实现依次 staticcall 控制面 `paused()`、`isBlocked(to)`、
+        //       `isBlocked(from)`,然后 emit Transfer。
+        //    ⇒ 代币自己执行转账时,封禁判据恰好是「控制面.isBlocked(from) ∨
+        //       控制面.isBlocked(to)」,没有代币侧名单。
+        //    本段旧版本把 ② 里的 PUSH4 误读成了代币自己的分发入口,于是多问了两次代币;那两次
+        //    在唯一的目标资产上恒 revert,让本闸在真实代币上【永远】判成读不到(bit 19)。
+        //
+        // 🔴 不读代币侧,为什么不会静默漏掉一条「代币侧封禁」—— 这是【有条件】的论证,
+        //    不是全称命题:
+        //    前提 A:G0 通过 ⇒ 代币地址上的代码就是那份 codehash 被钉住的代理;代理的 beacon
+        //            地址写死在它的代码里 ⇒ beacon 就是 CONTROL_PLANE。
+        //    前提 B:G4 通过 ⇒ 控制面此刻报告的实现 == ctx.expectedImpl。
+        //    前提 C:ctx.expectedImpl 恰好就是 ③ 里被 trace 过的那份实现 0xbd14…57da。
+        //    A ∧ B ∧ C ⇒ 代币此刻执行的就是那份只问控制面的实现 ⇒ 本闸问的这两次,正是代币
+        //    自己转账时会问的那两次。实现一旦被升级成别的,B 不再成立 ⇒ G4 置位 ⇒
+        //    `ok == false`,调用方照样被拦。
+        //    ⚠ 前提 C 本合约【检查不了】:调用方把 expectedImpl 填成任何别的实现(哪怕是它
+        //    自己审计过的),本论证就不覆盖它 —— 那份实现若另带一份代币侧名单,本闸看不见。
+        //    这是声明在案的残余:只对 G3 这一条理由是 fail-open,兜底只有调用方对 expectedImpl
+        //    的审计。别把这段改写成「代币永远没有自己的名单」。
+        //
+        // ⚠ 行为方 / 对手方为零地址时,与【那个字段】相关的那一次 `isBlocked` 不发出,位照样
         //    置上(bit 19)⇒ 这不是被禁止的短路(被禁的短路是「跳过一道闸而它的位保持干净」)。
         //    🔴 而这条「不发」的理由【只对实参成立】,别外推:问 `isBlocked(address(0))` 会
         //    得到一个【问错了主语】的真答案,拿它置 bit 3 等于把一条关于零地址的封禁冒充成
         //    关于行为方的 ⇒ 不发在这里不是优化,是语义上必须的。
-        //    抹除是【逐字段】的:一个字段为零只抹掉它自己那两次读,另一个字段的两次照发。
-        // ⚠ 行为方与对手方相同时【不去重】,四次读照发 —— 「无对手时填与行为方相同的地址」
+        //    抹除是【逐字段】的:一个字段为零只抹掉它自己那一次读,另一个字段的那一次照发。
+        // ⚠ 行为方与对手方相同时【不去重】,两次读照发 —— 「无对手时填与行为方相同的地址」
         //    是常态;去重会让扇出在常态下掉下来。
-        // 🔴 闸内不短路:下面四次读各自只受「它的实参是否为零」门控,绝不受前一次读的结果
+        // 🔴 闸内不短路:下面两次读各自只受「它的实参是否为零」门控,绝不受前一次读的结果
         //    门控。`unreadable` 的累加只改变判据,不改变「发不发」。
-        // ⚠ 四次读的结果按位或攒进 `words`:`任意一次 word != 0` 与 `(w1|w2|w3|w4) != 0`
+        // ⚠ 两次读的结果按位或攒进 `words`:`任意一次 word != 0` 与 `(w1|w2) != 0`
         //    是同一个命题(而且只在 `else if` 里求值 ⇒ 读不到时这些字被丢弃,没有参与判决)。
         // ─────────────────────────────────────────────────────────────────────
         {
@@ -248,18 +271,6 @@ library GuardCore {
             bool unreadable = !actorSet || !counterpartySet;
             bytes32 words;
 
-            if (actorSet) {
-                (bool r, bytes32 w) =
-                    _readWord(token, abi.encodeWithSelector(SEL_IS_BLOCKED, ctx.actor));
-                unreadable = unreadable || !r;
-                words |= w;
-            }
-            if (counterpartySet) {
-                (bool r, bytes32 w) =
-                    _readWord(token, abi.encodeWithSelector(SEL_IS_BLOCKED, ctx.counterparty));
-                unreadable = unreadable || !r;
-                words |= w;
-            }
             if (actorSet) {
                 (bool r, bytes32 w) =
                     _readWord(CONTROL_PLANE, abi.encodeWithSelector(SEL_IS_BLOCKED, ctx.actor));

@@ -53,6 +53,17 @@ The guard reports the absence of eight named conditions, plus an unreadable bit 
 
 Once a ratio transition has completed, the ratio condition reads clean; with every other condition clear, reasonBits is exactly 0 and the guard lets a redeem through. Both demo vaults pay one token per share and never use the multiplier in that payout, so after the transition both pay the wrong amount. In the tested case the ratio halves: each vault pays twice the fair amount, and the first redeem empties the guarded vault, so the next holder's redeem reverts. This exposure is declared, not fixed: test/Integration.t.sol measures it (AS-29d).
 
+G3 reads the blocklist from the shared control contract only: once for the
+acting party, then once for the counterparty. The equity token has no
+`isBlocked` function of its own. The token implementation traced on
+2026-09-16 (`0xbd14156e…57da`) asks the control contract about both the
+sender and the recipient, and nothing else. That makes skipping the token safe
+only under three conditions: G0 passes, G4 passes, and the `expectedImpl` you
+pass is that traced implementation. The guard cannot check the third condition
+itself. **Before you trust G3 with any other `expectedImpl`, trace that
+implementation's transfer path yourself**: a different implementation could
+keep a list of its own, and the guard would not read it.
+
 An off-chain `eth_call` answer is advisory and carries a time-of-check to
 time-of-use window; it can be stale as soon as the next block. Only
 in-transaction evaluation through the integration library, reverting on failure,
@@ -60,7 +71,8 @@ is atomic.
 
 Both chains receive the same build artifact, deployed with a plain `CREATE`,
 never `CREATE2`. The two deployments below share one address only because the
-same deployer used nonce 0 on both chains; nothing depends on that.
+same deployer sent its second transaction (nonce 1) on both chains; nothing
+depends on that.
 On a chain where the token and the control plane do not exist, every call returns
 `ok == false` with at least the unreadable bits of G0 through G5 and the
 aggregate bit set. That is the designed consequence, not a failure. G1 through G5
@@ -131,19 +143,26 @@ broadcast record can end up committed.
 
 | Network | Address | Contract |
 |---|---|---|
-| Robinhood Chain testnet (chain id 46630) | `0x44C8B6c094a20e17Cc5A7D9C8227dFD631260a2e` | `RWAGuardView` |
-| Arbitrum Sepolia (chain id 421614) | [`0x44C8B6c094a20e17Cc5A7D9C8227dFD631260a2e`](https://sepolia.arbiscan.io/address/0x44C8B6c094a20e17Cc5A7D9C8227dFD631260a2e) | `RWAGuardView` |
+| Robinhood Chain testnet (chain id 46630) | `0xA808d1d502F9B8eFd3481De9cE2717d7dBfc8f3C` | `RWAGuardView` |
+| Arbitrum Sepolia (chain id 421614) | [`0xA808d1d502F9B8eFd3481De9cE2717d7dBfc8f3C`](https://sepolia.arbiscan.io/address/0xA808d1d502F9B8eFd3481De9cE2717d7dBfc8f3C) | `RWAGuardView` |
 
 On both chains the deployed runtime bytecode equals the build artifact's
 `deployedBytecode` byte for byte.
 
-Observed with one `eth_call` each (no price feed passed, so G6 and G8 are
-unreadable in both):
+An earlier build is still on chain at `0x44C8B6c094a20e17Cc5A7D9C8227dFD631260a2e` on both networks. Do not use
+it: its G3 also asked the token for `isBlocked`, which the token does not
+implement, so G3 was unreadable on every real token. The addresses above
+replace it (redeployed 2026-09-17).
 
-- Robinhood Chain testnet, TSLA token, the control plane's current
-  implementation as `expectedImpl`: `reasonBits == 0x8000…01480000` -- G0, G1,
-  G2, G4 and G5 were read and none fired; G3, G6 and G8 were unreadable.
-  Passing a different `expectedImpl` sets the G4 bit (`…01480010`).
+Observed with one `eth_call` each on 2026-09-17 (no price feed passed, so G6
+and G8 are unreadable in both):
+
+- Robinhood Chain testnet, TSLA token, two non-zero parties, the control
+  plane's current implementation as `expectedImpl`:
+  `reasonBits == 0x8000…01400000` -- G0 through G5 were read and none fired;
+  only G6 and G8 were unreadable. With the counterparty left as the zero
+  address, G3's unreadable bit comes back (`…01480000`). Passing a different
+  `expectedImpl` sets the G4 bit (`…01400010`).
 - Arbitrum Sepolia, where the token and the control plane do not exist:
   `reasonBits == 0x8000…017f0000` -- the unreadable bits of G0 through G6 and
   G8, plus the aggregate bit, the designed consequence described above.

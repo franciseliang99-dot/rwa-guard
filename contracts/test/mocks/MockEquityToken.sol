@@ -17,7 +17,7 @@ contract MockEquityToken {
     uint256 internal constant WAD = 1e18; // constant: no slot, delegatecall-safe
 
     bool public pausedFlag;                                                 // slot 0
-    mapping(address => bool) public blocked;                                // slot 1
+    mapping(address => bool) internal _retiredBlockedSlot;                  // slot 1 -- RETIRED placeholder, never read or written; kept so slots 2..10 stay aligned behind the proxy
     uint256 public ui;                                                      // slot 2
     uint256 public newUi;                                                   // slot 3
     uint256 public effAt;                                                   // slot 4  (uint256, never uint64)
@@ -34,18 +34,17 @@ contract MockEquityToken {
     error InsufficientAllowance(address owner, address spender, uint256 have, uint256 need);
     error UnsupportedSelector(bytes4 selector);
 
-    // Deliberately NOT implemented: implementation(), decimals(), symbol(). A real equity-token
-    // proxy reverts on implementation() (that selector is emitted by the proxy toward the plane,
-    // never dispatched to callers of the token), and the guard makes zero ERC-20 metadata reads.
-    // Declaring any of the three here would only invite an implementer to read from them.
+    // Deliberately NOT implemented: implementation(), decimals(), symbol(), isBlocked(address).
+    // A real equity-token proxy reverts on implementation() (that selector is emitted by the proxy
+    // toward the plane, never dispatched to callers of the token), and the guard makes zero ERC-20
+    // metadata reads. isBlocked(address) is absent on the real token too (measured 2026-09-16,
+    // chain 46630: empty-data revert; the real implementation asks the control plane instead), and
+    // a fixture that answered it is exactly how a guard reading the token stayed green here while
+    // it was permanently unreadable on-chain. Declaring any of the four would only invite an
+    // implementer to read from them.
 
     function paused() external view returns (bool) {
         FixtureMutator.respond(_mutator[this.paused.selector], _boolWord(pausedFlag));
-        revert(); // unreachable: respond() always terminates via assembly return/revert above
-    }
-
-    function isBlocked(address who) external view returns (bool) {
-        FixtureMutator.respond(_mutator[this.isBlocked.selector], _boolWord(blocked[who]));
         revert(); // unreachable: respond() always terminates via assembly return/revert above
     }
 
@@ -66,10 +65,6 @@ contract MockEquityToken {
 
     function setPaused(bool v) external {
         pausedFlag = v;
-    }
-
-    function setBlocked(address who, bool v) external {
-        blocked[who] = v;
     }
 
     function setRatios(uint256 ui_, uint256 newUi_, uint256 effAt_) external {
@@ -174,12 +169,11 @@ contract MockEquityToken {
         _callbackData = data;
     }
 
-    /// Reverts UnsupportedSelector unless selector is one of paused()/isBlocked(address)/
-    /// uiMultiplier()/newUIMultiplier()/effectiveAt(). No access control: this is a fixture.
+    /// Reverts UnsupportedSelector unless selector is one of paused()/uiMultiplier()/
+    /// newUIMultiplier()/effectiveAt(). No access control: this is a fixture.
     function setMutator(bytes4 selector, uint8 kind, uint256 arg, bytes32 wordA, bytes32 wordB) external {
         if (
             selector != this.paused.selector &&
-            selector != this.isBlocked.selector &&
             selector != this.uiMultiplier.selector &&
             selector != this.newUIMultiplier.selector &&
             selector != this.effectiveAt.selector

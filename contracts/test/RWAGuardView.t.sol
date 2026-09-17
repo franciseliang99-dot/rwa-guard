@@ -464,6 +464,7 @@ contract RWAGuardViewTest is GatesBaseline {
                 changedSpan++;
             }
         }
-        assertTrue(changedSpan >= 3, "AS-U3-10: the change-control arm spans at least 3 gates");
+        // G3CP: no-code tokens now span {G0,G2,G5} (G3 reads only the plane), so the floor is 2 to stay >= 1 gate under any single-gate mutation.
+        assertTrue(changedSpan >= 2, "AS-U3-10: the change-control arm spans at least 2 gates");
     }
 }

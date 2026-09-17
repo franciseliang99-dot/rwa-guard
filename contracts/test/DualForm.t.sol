@@ -309,7 +309,7 @@ contract DualFormLayoutTest is DualFormBase {
         assertTrue(c.counterparty == c.actor, "AS-1: precondition the environment copy has counterparty equal to actor");
         _d_within(_d_dual(guard, e.token, c), 0);
 
-        MockEquityToken(e.token).setBlocked(ACTOR, true);
+        e.plane.setBlocked(ACTOR, true);
         assertTrue(
             c.counterparty == c.actor,
             "AS-1: precondition the environment copy still has counterparty equal to actor"
@@ -390,7 +390,7 @@ contract DualFormAgreementTest is DualFormBase {
     }
 
     // TS-25 test_AS1_crossTupleDiscrimination: discrimination arm for the comparison
-    // itself. Each differing pair differs in at least 2 gates ({G0,G2,G3,G5} against
+    // itself. Each differing pair differs in at least 2 gates ({G0,G2,G5} against
     // {} and against {G4,G6,G8}), and the battery applies one mutation at a time, so
     // this arm is invariant under M-G0..M-G8.
     function test_AS1_crossTupleDiscrimination() public {
@@ -403,7 +403,7 @@ contract DualFormAgreementTest is DualFormBase {
         uint256 bitsNeverDeployed = _d_dual(guard, NEVER_DEPLOYED, e.ctx);
         _d_within(
             bitsNeverDeployed,
-            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 19) | (uint256(1) << 21) | (uint256(1) << 255)
+            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 21) | (uint256(1) << 255)
         );
 
         _p1_crossPair(guard, TOKEN, NEVER_DEPLOYED, e.ctx);
@@ -427,7 +427,7 @@ contract DualFormAgreementTest is DualFormBase {
         assertEq(_d_writeCount(diffBoth), 0, "AS-1: evaluating both forms performs zero storage writes");
 
         vm.startStateDiffRecording();
-        MockEquityToken(e.token).setBlocked(BLOCKED_ACTOR, true);
+        e.plane.setBlocked(BLOCKED_ACTOR, true);
         Vm.AccountAccess[] memory diffSetter = vm.stopAndReturnStateDiff();
         assertTrue(_d_writeCount(diffSetter) >= 1, "AS-1: control: a fixture setter is recorded as a storage write");
 
@@ -545,19 +545,20 @@ contract DualFormAgreementTest is DualFormBase {
         _d_within(bits, (uint256(1) << 2));
     }
 
-    // mirrors: test_AS7_1_tokenBlocksActor (test/Gates.t.sol); value there: (uint256(1) << 3)
+    // mirrors: test_AS7_3_planeBlocksActor (test/Gates.t.sol); value there: (uint256(1) << 3)
     function test_AS1_g3ViolatedAlone() public {
         Env memory e = _baseline();
         RWAGuardView guard = _d_deploy();
 
-        MockEquityToken(e.token).setBlocked(ACTOR, true);
+        e.plane.setBlocked(ACTOR, true);
 
         {
-            (bool ok, uint256 len, bytes32 word0) =
-                _d_rawRead(e.token, abi.encodeWithSelector(MockEquityToken.isBlocked.selector, ACTOR));
-            assertTrue(ok, "AS-1: precondition raw isBlocked(ACTOR) on the token succeeds");
-            assertEq(len, 32, "AS-1: precondition raw isBlocked(ACTOR) on the token returns 32 bytes");
-            assertTrue(word0 != bytes32(0), "AS-1: precondition raw isBlocked(ACTOR) on the token returns a nonzero word");
+            (bool ok, uint256 len, bytes32 word0) = _d_rawRead(
+                GuardCore.CONTROL_PLANE, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)
+            );
+            assertTrue(ok, "AS-1: precondition raw isBlocked(ACTOR) on the control plane succeeds");
+            assertEq(len, 32, "AS-1: precondition raw isBlocked(ACTOR) on the control plane returns 32 bytes");
+            assertTrue(word0 != bytes32(0), "AS-1: precondition raw isBlocked(ACTOR) on the control plane returns a nonzero word");
         }
 
         uint256 bits = _d_dual(guard, e.token, e.ctx);
@@ -641,7 +642,7 @@ contract DualFormAgreementTest is DualFormBase {
         _d_within(bits, (uint256(1) << 8));
     }
 
-    // mirrors: test_AS4a_neverDeployedToken (test/Gates.t.sol); value there: (1<<16)|(1<<18)|(1<<19)|(1<<21)|(1<<255)
+    // mirrors: test_AS4a_neverDeployedToken (test/Gates.t.sol); value there: (1<<16)|(1<<18)|(1<<21)|(1<<255)
     function test_AS1_g0UnreadableNotAlone() public {
         Env memory e = _baseline();
         RWAGuardView guard = _d_deploy();
@@ -654,7 +655,7 @@ contract DualFormAgreementTest is DualFormBase {
         uint256 bits = _d_dual(guard, NEVER_DEPLOYED, e.ctx);
         _d_within(
             bits,
-            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 19) | (uint256(1) << 21) | (uint256(1) << 255)
+            (uint256(1) << 16) | (uint256(1) << 18) | (uint256(1) << 21) | (uint256(1) << 255)
         );
     }
 
@@ -699,7 +700,6 @@ contract DualFormAgreementTest is DualFormBase {
         Env memory e = _baseline();
         RWAGuardView guard = _d_deploy();
 
-        MockEquityToken(e.token).setBlocked(address(0), true);
         e.plane.setBlocked(address(0), true);
         e.ctx.actor = address(0);
 
@@ -795,7 +795,7 @@ contract DualFormAgreementTest is DualFormBase {
         _nonProxyToken(e);
         e.plane.setPaused(true);
         MockEquityToken(e.token).setPaused(true);
-        MockEquityToken(e.token).setBlocked(ACTOR, true);
+        e.plane.setBlocked(ACTOR, true);
         e.plane.setImplementation(address(new MockEquityToken()));
         MockEquityToken(e.token).setRatios(1e18, 2e18, 0);
         e.feed.setFollowNow(false);
@@ -815,8 +815,8 @@ contract DualFormAgreementTest is DualFormBase {
         MockEquityToken(e.token).setMutator(
             MockEquityToken.paused.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0)
         );
-        MockEquityToken(e.token).setMutator(
-            MockEquityToken.isBlocked.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0)
+        e.plane.setMutator(
+            MockControlPlane.isBlocked.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0)
         );
         MockEquityToken(e.token).setMutator(
             MockEquityToken.uiMultiplier.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0)
@@ -930,24 +930,18 @@ contract DualFormAgreementTest is DualFormBase {
         Env memory e = _baseline();
         RWAGuardView guard = _d_deploy();
         e.plane.setPaused(true);
-        e.plane.setMutator(
-            MockControlPlane.isBlocked.selector, FixtureMutator.REVERT, 0, bytes32(0), bytes32(0)
-        );
-        MockEquityToken(e.token).setBlocked(ACTOR, true);
+        e.ctx.counterparty = address(0);
+        e.plane.setBlocked(ACTOR, true);
         {
-            (bool success, uint256 len, bytes32 word0) =
-                _d_rawRead(e.token, abi.encodeWithSelector(MockEquityToken.isBlocked.selector, ACTOR));
-            assertTrue(
-                success && len == 32 && word0 != bytes32(0),
-                "AS-1: precondition token-side isBlocked(actor) answers a non-zero word"
-            );
-        }
-        {
-            (bool success, , ) = _d_rawRead(
+            (bool success, uint256 len, bytes32 word0) = _d_rawRead(
                 GuardCore.CONTROL_PLANE, abi.encodeWithSelector(MockControlPlane.isBlocked.selector, ACTOR)
             );
-            assertFalse(success, "AS-1: precondition plane-side isBlocked(actor) fails to answer");
+            assertTrue(
+                success && len == 32 && word0 != bytes32(0),
+                "AS-1: precondition plane-side isBlocked(actor) answers a non-zero word"
+            );
         }
+        assertTrue(e.ctx.counterparty == address(0), "AS-1: precondition ctx.counterparty is zero");
         {
             (bool success, uint256 len, bytes32 word0) =
                 _d_rawRead(GuardCore.CONTROL_PLANE, abi.encodeWithSelector(MockControlPlane.paused.selector));

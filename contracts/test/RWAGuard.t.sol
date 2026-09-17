@@ -292,7 +292,8 @@ contract RWAGuardTest is GatesBaseline {
 
         (bool k7Reverted, uint256 k7Bits) = _u4_assertForms(host, NEVER_DEPLOYED, e.ctx, tag);
         assertTrue(k7Reverted, "AS-U4-2: k7 NEVER_DEPLOYED must revert");
-        assertTrue(_u4_gateSpan(k7Bits) >= 3, "AS-U4-2: k7 gate span is at least 3");
+        // G3CP: no-code tokens now span {G0,G2,G5} (G3 reads only the plane), so the floor is 2 to stay >= 1 gate under any single-gate mutation.
+        assertTrue(_u4_gateSpan(k7Bits) >= 2, "AS-U4-2: k7 gate span is at least 2");
         _u4_rawCheck(host, NEVER_DEPLOYED, e.ctx, false, k7Bits, tag);
 
         (bool k8Reverted, ) = _u4_assertForms(host, address(0), e.ctx, tag);
@@ -346,7 +347,8 @@ contract RWAGuardTest is GatesBaseline {
         (s, ret) = _u4_rawEnforce(host, token, ctx);
         assertFalse(s, string.concat(tag, "gate case enforce must revert"));
         _u4_assertGuardBlockedPayload(ret, token, bits, tag);
-        assertTrue(_u4_gateSpan(bits) >= 3, string.concat(tag, "gate case span is at least 3"));
+        // G3CP: no-code tokens now span {G0,G2,G5} (G3 reads only the plane), so the floor is 2 to stay >= 1 gate under any single-gate mutation.
+        assertTrue(_u4_gateSpan(bits) >= 2, string.concat(tag, "gate case span is at least 2"));
     }
 
     function test_U4_4_enforceMatchesCheckEachGateViolated() public {
@@ -382,9 +384,9 @@ contract RWAGuardTest is GatesBaseline {
     }
 
     function _u4_case4_g3(Env memory e, RWAGuardHost host, string memory tag) internal returns (bool reverted) {
-        MockEquityToken(e.token).setBlocked(ACTOR, true);
+        e.plane.setBlocked(ACTOR, true);
         (reverted, ) = _u4_assertForms(host, TOKEN, e.ctx, tag);
-        MockEquityToken(e.token).setBlocked(ACTOR, false);
+        e.plane.setBlocked(ACTOR, false);
         _u4_assertClean(host, TOKEN, e.ctx, tag);
     }
 
@@ -557,9 +559,9 @@ contract RWAGuardTest is GatesBaseline {
         RWAGuardHost host = _u4_deployHost();
         string memory tag = "AS-U4-7: ";
 
-        MockEquityToken(e.token).setBlocked(BLOCKED_ACTOR, true);
+        e.plane.setBlocked(BLOCKED_ACTOR, true);
         assertTrue(
-            MockEquityToken(e.token).isBlocked(BLOCKED_ACTOR),
+            e.plane.isBlocked(BLOCKED_ACTOR),
             string.concat(tag, "fixture check: blocked actor reads back blocked")
         );
 
@@ -591,7 +593,8 @@ contract RWAGuardTest is GatesBaseline {
         (bool okND, uint256 bitsND) = host.check(NEVER_DEPLOYED, e.ctx);
         assertFalse(okND, string.concat(tag, "NEVER_DEPLOYED must not be clean, for the change control"));
         assertTrue(bitsND != b1, string.concat(tag, "NEVER_DEPLOYED reasonBits differ from the clean baseline"));
-        assertTrue(_u4_gateSpan(bitsND) >= 3, string.concat(tag, "NEVER_DEPLOYED gate span is at least 3"));
+        // G3CP: no-code tokens now span {G0,G2,G5} (G3 reads only the plane), so the floor is 2 to stay >= 1 gate under any single-gate mutation.
+        assertTrue(_u4_gateSpan(bitsND) >= 2, string.concat(tag, "NEVER_DEPLOYED gate span is at least 2"));
     }
 
     function _u4_case7_enforceReverts(

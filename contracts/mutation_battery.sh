@@ -174,9 +174,9 @@ EOF
 #
 # Always-green functions (never appear below):
 #   Clean arms: AS0, AS5_2, AS9, AS12_1, AS13_b, AS13b_b, AS17_2, AS16,
-#     AS14, AS35.
+#     AS14, AS35, AS7_1, AS7_2 (G3CP token-has-no-list pins).
 #   Self-checks: AS25, AS26, GuardBits x4.
-#   Sentinel: AS18b.
+#   Sentinel: AS18b, AS7_5 (counts-only function).
 #   Feed and gas: AS27_gasBand, AS27b, AS28_c, AS28_r19, AS34.
 #   G6 plus G8 fed: AS19 x2 and AS19b.
 #   Vault arms: AS29d; both AS30 CEI arms under the M-G rows and under
@@ -195,10 +195,12 @@ EOF
 # controls (viewDecodesSpecOrderCalldata, crossTupleDiscrimination,
 # interveningWriteChangesVerdict) survive because every non-zero tuple
 # spans at least two gates; the zero-ctx tuple spans G3, G4, G6 and G8.
-# Margin-1: U4_4 and U4_5 reverted>=7, and gateSpan>=3 in U4_2, U4_3,
-# U4_7 and U3_10, sit at margin 1 under one mutation: the no-stacking
-# rule (every arm on a fresh copy, never stacked) is load-bearing for
-# them.
+# Margin-1: U4_4 and U4_5 reverted>=7, and gateSpan>=2 (G3CP; was >=3)
+# in U4_2, U4_3, U4_7 and U3_10, sit at margin 1 under one mutation: the
+# no-stacking rule (every arm on a fresh copy, never stacked) is
+# load-bearing for them. G3CP lowered the U4_2/U4_3/U4_7/U3_10 floors
+# from 3 to 2 because no-code token tuples now span only 3 gates
+# ({G0,G2,G5}), so margin 1 is preserved.
 #
 # AS-30 / AS-29(a) / AS-29b / AS-40 are green under every M-G row, not
 # under every row below: AS-30 re-entry arms are red in M-LOCK; the
@@ -281,21 +283,14 @@ M-G2 test_AS20_pausedWordTwoIsPaused AS-20 derived
 # ---- M-G3 --------------------------------------------------------------
 # The unreadable-side AS-18 function loses bit N+16 for N=1..6, bit 0
 # for N=0, bit 8 for N=8.
-# k/j: AS-4 k=3 j=3 here. Codehash 0 means G0 unreadable, and empty
-#   replies mean token reads unreadable.
 # k/j: AS-5 k=4 j=1 here (the plane-has-no-code arm only).
-# k/j: AS-7 k=4 j=4 here (all four members).
+# k/j: AS-7 k=5 j=2 here (the two plane-side members; G3CP: AS7_1/AS7_2 are now token-has-no-list pins asserting zero/masked bits and AS7_5 counts fan-out only, so all three are green).
 # k/j: AS-8 k=3 j=3 here (all three members).
 # k/j: AS-18 k=7 j=5 here (the two noShortCircuit functions plus the
 #   violated-and-unreadable-across-gates, zero-ctx and
 #   g3-absorbs-beside-g1 combos).
 # k/j: AS-24 k=2 j=2 here (both members).
-M-G3 test_AS4a_neverDeployedToken AS-4 derived
-M-G3 test_AS4b_eoaToken AS-4 derived
-M-G3 test_AS4c_zeroAddressToken AS-4 derived
 M-G3 test_AS5_3_planeHasNoCode AS-5 derived
-M-G3 test_AS7_1_tokenBlocksActor AS-7 derived
-M-G3 test_AS7_2_tokenBlocksCounterparty AS-7 derived
 M-G3 test_AS7_3_planeBlocksActor AS-7 derived
 M-G3 test_AS7_4_planeBlocksCounterparty AS-7 derived
 M-G3 test_AS8_zeroActor AS-8 derived
@@ -462,8 +457,8 @@ M-NAIVE test_AS30_ceiNaiveTransferSeesPostState AS-30 derived
 # DualForm combo1 stay green). This is the whole-shift arm that KG-13
 # asked for, done in-slot: a +1 shift would push G6 onto reserved bit 7.
 # Derived twice by two independent readers; the two lists agreed line
-# for line (77 each) before the first run.
-# Per file: Gates 32, DualForm 27, Attacks 13, Fixtures 2, DemoVaults 2,
+# for line (75 each; G3CP removed the two token-side AS-7 functions) before the first run.
+# Per file: Gates 30, DualForm 27, Attacks 13, Fixtures 2, DemoVaults 2,
 #   Integration 1; GuardBits, RWAGuard, RWAGuardView, DemoVaultEdges 0.
 M-PERM test_AS10_implDrift AS-10 derived
 M-PERM test_AS11_bit24_forward AS-11 derived
@@ -535,8 +530,6 @@ M-PERM test_AS5_4_planePausedRevertsUnreadable AS-5 derived
 M-PERM test_AS6_1_tokenPaused AS-6 derived
 M-PERM test_AS6_2_pausedWord31Bytes AS-6 derived
 M-PERM test_AS6_3_pausedWord64Bytes AS-6 derived
-M-PERM test_AS7_1_tokenBlocksActor AS-7 derived
-M-PERM test_AS7_2_tokenBlocksCounterparty AS-7 derived
 M-PERM test_AS7_3_planeBlocksActor AS-7 derived
 M-PERM test_AS7_4_planeBlocksCounterparty AS-7 derived
 M-PERM test_AS8_positiveControl AS-8 derived

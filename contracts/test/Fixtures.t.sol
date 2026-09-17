@@ -273,12 +273,12 @@ contract FixturesTest is TestBase {
         // Arm (1): full ctx, standalone C6 (FD-U5-3 / B7 -- no proxy in the loop, so the plane's
         // implementation() staticcall a real proxy would add on every token call never fires here).
         uint256[4] memory arm1 = _fx_recordedEvaluate(address(token), address(feed), ctx);
-        assertEq(arm1[0], 6, "AS-39: arm1 token staticcall count");
+        assertEq(arm1[0], 4, "AS-39: arm1 token staticcall count");
         assertEq(arm1[1], 4, "AS-39: arm1 plane staticcall count");
         assertEq(arm1[2], 2, "AS-39: arm1 feed staticcall count");
-        // 12 not 13 -- EXTCODEHASH is kind Extcodehash, excluded by kind (never counted here);
-        // token 6 + plane 4 + feed 2 = 12; never count DelegateCall.
-        assertEq(arm1[3], 12, "AS-39: arm1 total staticcall count is 12, not 13");
+        // 10 not 11 -- EXTCODEHASH is kind Extcodehash, excluded by kind (never counted here);
+        // token 4 + plane 4 + feed 2 = 10; never count DelegateCall.
+        assertEq(arm1[3], 10, "AS-39: arm1 total staticcall count is 10, not 11");
         // Deliberately NO reasonBits assertion in any arm of AS-39(a): this function must stay outside every mutation expected-red set (MUTATION-OVERREACH sentinel). The standalone-token baseline would read 1<<0 (G0 violated, FD-U5-3); that value is asserted in AS-39(c)'s reset arm, not here.
 
         // Arm (2): actor/counterparty/priceFeed zeroed outside the recording window. Zeroing must
@@ -306,15 +306,15 @@ contract FixturesTest is TestBase {
             maxFeedAge: ctx.maxFeedAge
         });
         uint256[4] memory arm3 = _fx_recordedEvaluate(address(token), address(feed), ctxNoImpl);
-        assertEq(arm3[0], 6, "AS-39: arm3 token staticcall count");
+        assertEq(arm3[0], 4, "AS-39: arm3 token staticcall count");
         assertEq(arm3[1], 4, "AS-39: arm3 plane staticcall count");
         assertEq(arm3[2], 2, "AS-39: arm3 feed staticcall count");
-        assertEq(arm3[3], 12, "AS-39: arm3 total staticcall count");
+        assertEq(arm3[3], 10, "AS-39: arm3 total staticcall count");
         // No reasonBits assertion for arm (3) (design doc, test 12).
 
         // AS-39(a) red on any count above => suspect the hand-written Vm.AccountAccess /
         // AccountAccessKind declarations in Base.sol first, the guard second.
-        assertTrue(arm1[0] != arm2[0], "AS-39: arm1 != arm2 token count");
+        assertEq(arm1[0], arm2[0], "AS-39: G3 no longer reads the token, so zeroing the parties leaves the token count unchanged");
         assertTrue(arm1[1] != arm2[1], "AS-39: arm1 != arm2 plane count");
         assertTrue(arm1[2] != arm2[2], "AS-39: arm1 != arm2 feed count");
         assertEq(arm3[0], arm1[0], "AS-39: arm3 == arm1 token count");
@@ -675,17 +675,14 @@ contract FixturesTest is TestBase {
     function test_C6_surface_declaredSelectorsReturn32Bytes() public {
         (MockEquityToken token, , , ) = _baseline();
 
-        bytes4[5] memory reads = [
+        bytes4[4] memory reads = [
             token.paused.selector,
-            token.isBlocked.selector,
             token.uiMultiplier.selector,
             token.newUIMultiplier.selector,
             token.effectiveAt.selector
         ];
         for (uint256 i = 0; i < reads.length; i++) {
-            bytes memory cd = reads[i] == token.isBlocked.selector
-                ? abi.encodeWithSelector(reads[i], ACTOR)
-                : abi.encodeWithSelector(reads[i]);
+            bytes memory cd = abi.encodeWithSelector(reads[i]);
             (bool ok, uint256 size, ) = _raw(address(token), cd, BUDGET_HIGH, 32);
             assertTrue(ok, "C6: declared selector must succeed");
             assertEq(size, 32, "C6: declared selector must return exactly 32 bytes");
@@ -706,6 +703,10 @@ contract FixturesTest is TestBase {
             (bool ok, , ) = _raw(address(token), abi.encodePacked(undeclared[i]), BUDGET_HIGH, 32);
             assertFalse(ok, "C6: undeclared selector must revert on the token");
         }
+
+        (bool okBlocked, , ) =
+            _raw(address(token), abi.encodeWithSignature("isBlocked(address)", ACTOR), BUDGET_HIGH, 32);
+        assertFalse(okBlocked, "C6: isBlocked(address) must revert (the real token has none)");
 
         (bool okPaused, uint256 sizePaused, ) =
             _raw(address(token), abi.encodeWithSelector(token.paused.selector), BUDGET_HIGH, 32);
@@ -730,25 +731,25 @@ contract FixturesTest is TestBase {
 
     function test_C6_mutator_length0() public {
         MockEquityToken token = new MockEquityToken();
-        bytes4 sel = token.isBlocked.selector;
+        bytes4 sel = token.uiMultiplier.selector;
         token.setMutator(sel, FixtureMutator.LENGTH, 0, bytes32(0), bytes32(0));
-        (bool success, uint256 size, ) = _raw(address(token), abi.encodeWithSelector(sel, ACTOR), gasleft(), 32);
+        (bool success, uint256 size, ) = _raw(address(token), abi.encodeWithSelector(sel), gasleft(), 32);
         assertTrue(success, "C6: LENGTH 0 mutator must still succeed the call");
         assertEq(size, 0, "C6: LENGTH 0 mutator must return zero bytes");
 
         token.setMutator(sel, FixtureMutator.NORMAL, 0, bytes32(0), bytes32(0));
-        (bool success2, uint256 size2, ) = _raw(address(token), abi.encodeWithSelector(sel, ACTOR), gasleft(), 32);
+        (bool success2, uint256 size2, ) = _raw(address(token), abi.encodeWithSelector(sel), gasleft(), 32);
         assertTrue(success2, "C6: restore to NORMAL must succeed");
         assertEq(size2, 32, "C6: restore to NORMAL must return 32 bytes");
     }
 
     function test_C6_mutator_length31() public {
         MockEquityToken token = new MockEquityToken();
-        token.setBlocked(ACTOR, true);
-        bytes4 sel = token.isBlocked.selector;
+        token.setPaused(true);
+        bytes4 sel = token.paused.selector;
         token.setMutator(sel, FixtureMutator.LENGTH, 31, bytes32(0), bytes32(0));
         (bool success, uint256 size, bytes memory head) =
-            _raw(address(token), abi.encodeWithSelector(sel, ACTOR), gasleft(), 31);
+            _raw(address(token), abi.encodeWithSelector(sel), gasleft(), 31);
         assertTrue(success, "C6: LENGTH 31 mutator must succeed");
         assertEq(size, 31, "C6: LENGTH 31 mutator must return exactly 31 bytes");
         bytes memory expected = new bytes(31);
@@ -756,21 +757,21 @@ contract FixturesTest is TestBase {
         for (uint256 i = 0; i < 31; i++) {
             expected[i] = normalWord[i];
         }
-        assertEqBytes(head, expected, "C6: LENGTH 31 bytes must be the first 31 bytes of the normal word");
+        assertEqBytes(head, expected, "C6: LENGTH 31 bytes must be the first 31 bytes of the normal word (pausedFlag is true)");
 
         token.setMutator(sel, FixtureMutator.NORMAL, 0, bytes32(0), bytes32(0));
-        (bool successR, uint256 sizeR, ) = _raw(address(token), abi.encodeWithSelector(sel, ACTOR), gasleft(), 32);
+        (bool successR, uint256 sizeR, ) = _raw(address(token), abi.encodeWithSelector(sel), gasleft(), 32);
         assertTrue(successR, "C6: restore to NORMAL must succeed");
         assertEq(sizeR, 32, "C6: restore to NORMAL must return 32 bytes");
     }
 
     function test_C6_mutator_length64() public {
         MockEquityToken token = new MockEquityToken();
-        bytes4 sel = token.isBlocked.selector;
-        token.setBlocked(ACTOR, true);
+        bytes4 sel = token.paused.selector;
+        token.setPaused(true);
         token.setMutator(sel, FixtureMutator.LENGTH, 64, bytes32(0), bytes32(0));
         (bool success, uint256 size, bytes memory head) =
-            _raw(address(token), abi.encodeWithSelector(sel, ACTOR), gasleft(), 64);
+            _raw(address(token), abi.encodeWithSelector(sel), gasleft(), 64);
         assertTrue(success, "C6: LENGTH 64 mutator must succeed");
         assertEq(size, 64, "C6: LENGTH 64 mutator must return exactly 64 bytes");
         bytes32 word0;
@@ -779,11 +780,11 @@ contract FixturesTest is TestBase {
             word0 := mload(add(head, 32))
             word1 := mload(add(head, 64))
         }
-        assertEqBytes32(word0, bytes32(uint256(1)), "C6: LENGTH 64 word0 must equal the normal word (blocked[ACTOR] is true)");
+        assertEqBytes32(word0, bytes32(uint256(1)), "C6: LENGTH 64 word0 must equal the normal word (pausedFlag is true)");
         assertEqBytes32(word1, bytes32(0), "C6: LENGTH 64 word1 (explicit zero padding) must be zero");
 
         token.setMutator(sel, FixtureMutator.NORMAL, 0, bytes32(0), bytes32(0));
-        (bool successR, uint256 sizeR, ) = _raw(address(token), abi.encodeWithSelector(sel, ACTOR), gasleft(), 32);
+        (bool successR, uint256 sizeR, ) = _raw(address(token), abi.encodeWithSelector(sel), gasleft(), 32);
         assertTrue(successR, "C6: restore to NORMAL must succeed");
         assertEq(sizeR, 32, "C6: restore to NORMAL must return 32 bytes");
     }
@@ -802,15 +803,6 @@ contract FixturesTest is TestBase {
         assembly { gotP := mload(add(headP, 32)) }
         assertEqBytes32(gotP, wordTwo, "C6: paused() RAW_WORD must be the exact word 2");
 
-        bytes4 blockedSel = token.isBlocked.selector;
-        token.setMutator(blockedSel, FixtureMutator.RAW_WORD, 0, wordTwo, bytes32(0));
-        (bool successB, uint256 sizeB, bytes memory headB) =
-            _raw(address(token), abi.encodeWithSelector(blockedSel, ACTOR), gasleft(), 32);
-        assertTrue(successB, "C6: RAW_WORD on isBlocked() must succeed");
-        assertEq(sizeB, 32, "C6: RAW_WORD on isBlocked() must return 32 bytes");
-        bytes32 gotB;
-        assembly { gotB := mload(add(headB, 32)) }
-        assertEqBytes32(gotB, wordTwo, "C6: isBlocked() RAW_WORD must be the exact word 2");
     }
 
     function test_C6_mutator_hugeUint256() public {
