@@ -309,7 +309,7 @@
     },
     {
       "path": "web/index.html",
-      "sha256": "474c9b0487bbe40a3852982c860f5e6c211f5879ad5bc7a3643a5d5a20872d6b",
+      "sha256": "1878901af9aa2c98e2d00c394d5d3d9932abe0b35c93ad3678131e6bf9d04fa6",
       "rule": "dir-code-ext",
       "keys": [
         "web/",
