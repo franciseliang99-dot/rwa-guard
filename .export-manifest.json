@@ -1,9 +1,17 @@
 {
   "schema": 2,
   "entry_id": "entries/arbitrum-openhouse",
-  "signature_digest": "f7b39c2cf7da0ffd55d9211e547c5963fd16e157610616de11a18215f9d2e0d4",
-  "file_count": 35,
+  "signature_digest": "b7f6c07ecf9c92be580fdcf83978b88c06f38be3d034408a0166efd803630f02",
+  "file_count": 36,
   "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "7f83615128599d82983a023645a131d8ccc671d5fc96fc60b31883dbd20a66ff",
+      "rule": "exact-file",
+      "keys": [
+        "LICENSE"
+      ]
+    },
     {
       "path": "README.md",
       "sha256": "d7f53fdb2f838873f17e589d3e28f760d26d21cbb9bbeec2afbea5f8731058c3",
